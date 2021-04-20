@@ -85,3 +85,9 @@ def test_weekly_stats(load_testdata_5m):
     assert hd is not None
     assert ws.data_start == pd.Timestamp('2020-09-01 00:37:07')
     assert ws.data_end == pd.Timestamp('2021-01-31 23:59:16')
+
+
+def test_t2m() -> None:
+    # test: all possibilities
+    for i in range(0, 60 * 24):
+        assert (i == hd.t2m(hd.m2t(i)))

@@ -1,7 +1,7 @@
 import logging
 import sys
 
-def dummy():
+def dummy_test():
     logging.basicConfig(level = logging.INFO, stream = sys.stdout)
     log = logging.getLogger('timely test')
     log.setLevel(logging.INFO)
@@ -12,4 +12,4 @@ def dummy():
     print('normal print 2')
     assert False, "dummy assertion"
 
-dummy()
+

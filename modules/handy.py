@@ -32,6 +32,16 @@ def to_unix(s):
 def series_to_dateTimeIndex(s):
     return pd.to_datetime(s.values)
 
+def m2t(minofday):
+    hour = minofday // 60
+    minute = minofday % 60
+    return hour + minute / 60
+
+# minute of the day, int [0 - 1440) to time of the day, float [0 - 24) )
+def t2m(timeofday):
+    hour, minute = modf(timeofday)
+    minute = minute * 60
+    return round(timeofday * 60)
 
 # requirement: dataframe must have 'created' and 'resolved' fields
 def augment_columns(df):
@@ -39,6 +49,7 @@ def augment_columns(df):
     df['delta_m'] = df.apply(lambda r: r['delta'].total_seconds() / 60, axis=1)
     # time of day of ticket open (float)
     df['tod'] = df.apply(lambda row: row['created'].hour + row['created'].minute / 60, axis=1)
+    df['mod'] = df.apply(lambda row: t2m(row['tod']), axis = 1)
     df['weekday'] = df.apply(lambda row: row['created'].weekday(), axis=1)
     df['hour'] = df.apply(lambda row: row['created'].hour, axis=1)
     # time of week (float)
