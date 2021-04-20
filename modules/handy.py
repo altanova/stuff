@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from math import modf
 
 format_slash = '%d/%m/%Y %H:%M'
 format_dash = '%Y-%m-%d %H:%M:%S'
