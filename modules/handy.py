@@ -11,12 +11,14 @@ format_dash_short = '%d-%m-%y %H:%M'
 # unix epoch
 epoch = pd.Timestamp("1970-01-01")
 
+
 # just a reminder how to convert from string to datetime column
 # use this for columns: created and resolved
 
 def to_datetime(df, input_column, output_column, fmt=format_dash, errors='coerce'):
     df[output_column] = pd.to_datetime(df[input_column], format=fmt, errors=errors)
     return df
+
 
 # unix timestamp from DateTimeIndex
 def to_unix(s):
@@ -25,9 +27,11 @@ def to_unix(s):
     # alternative implementation would be:
     # return s.astype('int64') // int(1e9)
 
+
 # series of pd.Timestamps -> DateTimeIndex of pd.Timestamps
 def series_to_dateTimeIndex(s):
     return pd.to_datetime(s.values)
+
 
 # requirement: dataframe must have 'created' and 'resolved' fields
 def augment_columns(df):
@@ -94,49 +98,92 @@ def outer_days(data_start, data_end):
     return (data_end.date() - data_start.date()).days + 1
 
 
-def weekly_bin_edges(outer_start, howmany):
+def weekly_bin_edges(outer_start, howmany: int):
     # add 1 for we count bin edges rather than bins
     week = pd.Timedelta(7, 'days')
-    return [outer_start + i * week for i in np.arange(howmany + 1)]
+    # this fails in previous versions of pandas
+    # return [outer_start + i * week for i in np.arange(howmany + 1)]
+    return [outer_start + i * week for i in range(howmany + 1)]
 
-
-def daily_bin_edges(start, howmany):
+def daily_bin_edges(start, howmany: int):
     # add 1 for we count bin edges rather than bins
     day = pd.Timedelta(1, 'days')
-    return [start.date() + i * day for i in np.arange(howmany + 1)]
-
-
-
-
+    # this fails in previous versions of pandas
+    # return [start.date() + i * day for i in np.arange(howmany + 1)]
+    return [start.date() + i * day for i in range(howmany + 1)]
 
 class WeeklyStats:
 
-    def __init__(self, data) -> object:
+    def __init__(self, data) -> None:
+        self.total_records = len(data)
         self.outer_start, self.outer_end, self.outer_weeks = outer_week_boundaries(data)
         self.inner_start, self.inner_end, self.inner_weeks = inner_week_boundaries(data)
         self.data_start, self.data_end = data.min(), data.max()
-        self.weekly_bins = weekly_bin_edges(self.outer_start, self.outer_weeks)
+        self.weekly_bins = weekly_bin_edges(self.outer_start, int(self.outer_weeks))
 
         self.days = fractional_days(self.data_start, self.data_end)
         self.outer_days = outer_days(self.data_start, self.data_end)
-        self.daily_bins = daily_bin_edges(self.data_start, self.outer_days)
+        self.daily_bins = daily_bin_edges(self.data_start, int(self.outer_days))
         self.weeks = self.days / 7
 
         # to be implemented
 
         # numpy histogram works with numbers only, that's why...
-        #to_timestamp = np.vectorize(lambda x: x.timestamp())
+        # to_timestamp = np.vectorize(lambda x: x.timestamp())
         # to_timestamp = np.vectorize(lambda x: x.value)
-        #to_timestamp = np.vectorize(lambda x: x.total_seconds())
-        #ts_data = to_timestamp(data)
-        #self.week_values, _ = np.histogram(ts_data, bins=self.weekly_bins)
-        #self.fullweek_values = self.week_values[1:-1]
+        # to_timestamp = np.vectorize(lambda x: x.total_seconds())
+        # ts_data = to_timestamp(data)
+        # self.week_values, _ = np.histogram(ts_data, bins=self.weekly_bins)
+        # self.fullweek_values = self.week_values[1:-1]
 
-        #self.weekly_minimum = self.fullweek_values.min()
-        #self.weekly_maximum = self.week_values.max()
+        # self.weekly_minimum = self.fullweek_values.min()
+        # self.weekly_maximum = self.week_values.max()
 
-        #self.day_values, _ = np.histogram(ts_data, bins=self.daily_bins)
-        #self.fullday_values = self.day_values[1:-1]
-        #self.daily_minimum = self.fullday_values.min()
-        #self.daily_maximum = self.daily_values.max()
+        # self.day_values, _ = np.histogram(ts_data, bins=self.daily_bins)
+        # self.fullday_values = self.day_values[1:-1]
+        # self.daily_minimum = self.fullday_values.min()
+        # self.daily_maximum = self.daily_values.max()
 
+
+def describe_histogram(ws: WeeklyStats, week_values, day_values):
+    fullweek_values = week_values[1:-1]
+    fullday_values = day_values[1:-1]
+    print('Basic statistics:\n')
+    print('Total records:\t{}'.format(ws.total_records))
+    print('Histogram range (outer weeks):{:.0f}'.format(ws.outer_weeks))
+    start, end = ws.outer_start, ws.outer_end
+    print('start:\t{}\t{}\nend:\t{}\t{}'.format(start, start.day_name(), end, end.day_name()))
+    print('Data range:')
+    start, end = ws.data_start, ws.data_end
+    print('start:\t{}\t{}\nend:\t{}\t{}'.format(start, start.day_name(), end, end.day_name()))
+    print('Full weeks (inner weeks):{:.0f}'.format(ws.inner_weeks))
+    start, end = ws.inner_start, ws.inner_end
+    print('start:\t{}\t{}\nend:\t{}\t{}'.format(start, start.day_name(), end, end.day_name()))
+    print('Data stats:')
+    print('weeks: {:.1f}\trecords per week:{:.1f},\t weekly min:{},\t weekly max:{}'.
+          format(ws.weeks, ws.total_records / ws.weeks, int(min(fullweek_values)), int(max(week_values))))
+    print('days: {:.1f}\trecords per day:{:.1f},\t daily min:{},\t daily max:{}'.
+          format(ws.days, ws.total_records / ws.days, int(min(fullday_values)), int(max(day_values))))
+    print('Note: The minima do not take into account the marginal (uncomplete) weeks or days')
+
+
+def draw_week_edges(axis, ws: WeeklyStats):
+    axis.axvline(x=ws.inner_start, color='r', linestyle='dashed', linewidth=2, label='inner (full) weeks range')
+    axis.axvline(x=ws.outer_start, color='b', linestyle='dashed', linewidth=2, label='outer (incomplete) weeks range')
+    axis.axvline(x=ws.inner_end, color='r', linestyle='dashed', linewidth=2)
+    axis.axvline(x=ws.outer_end, color='b', linestyle='dashed', linewidth=2)
+    axis.legend()
+
+
+def weekly_hist(axis, data):
+    ws = WeeklyStats(data)
+    w = axis.hist(x=data, bins=ws.weekly_bins)
+    draw_week_edges(axis, ws)
+    return w
+
+
+def daily_hist(axis, data):
+    ws = WeeklyStats(data)
+    draw_week_edges(axis, ws)
+    d = axis.hist(x=data, bins=ws.daily_bins, edgecolor='black')
+    return d
