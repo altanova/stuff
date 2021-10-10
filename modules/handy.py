@@ -199,3 +199,24 @@ def daily_hist(axis, data):
     draw_week_edges(axis, ws)
     d = axis.hist(x=data, bins=ws.daily_bins, edgecolor='black')
     return d
+
+# example:
+# round_up(345) -> 400
+# round_up(83459) -> 90000
+def round_up(x):
+    import math
+    if (x == 0):
+        return 0
+    order = 10 ** math.floor(np.log10(x))
+    # equal numbers
+    if ((x // order) == (x / order)):
+        return x
+    return order * ((x // order) + 1)
+
+# example: tidy_bins([35, 72, 89], bins = 4)
+# -> [0, 25, 50, 75, 100]
+def tidy_bins(data, bins = 10):
+    maxbin = round_up(max(data))
+    binsize = maxbin // bins
+    bins = np.arange(0, maxbin, binsize)
+    return np.append(bins, maxbin)
