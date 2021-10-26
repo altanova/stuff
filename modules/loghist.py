@@ -230,7 +230,8 @@ def lhist(axis,
           field, 
           group_field = None, 
           bin_density = 16,
-          ax_titles = None):
+          ax_titles = None,
+         annotate = True):
 
     # cannot present negative values on logarithm scale
 
@@ -239,7 +240,7 @@ def lhist(axis,
     # Do we have zeros in data? Then we will cheat a little, and upgrade zero to some small value
     smallest_observed_value = df[df[field] >0][field].min()
     almost_zero = smallest_observed_value / 2
-    df[df == 0][field] = almost_zero
+    df.loc[df[field] == 0, field] = almost_zero
     
     data = df[field]
 
@@ -264,10 +265,12 @@ def lhist(axis,
     
     axis.axvline(x=almost_zero, color='r', linestyle='dashed', linewidth=2, label = 'zero')
     axis.axvline(x=smallest_observed_value, color='b', linestyle='dashed', linewidth=2, label = '{:.3}'.format(smallest_observed_value))
+    axis.axvline(x=df[field].median(), color='black', linestyle='dashed', linewidth=2, label = 'median')
     from matplotlib.offsetbox import AnchoredText
-    message = 'Red dash represents zero.\nThere are {} zero values\nBlue dash = smallest positive value'.format(len(data[data == almost_zero]))
-    anchored_text = AnchoredText(message, loc=4)
-    axis.add_artist(anchored_text)
+    if (annotate):
+        message = 'Red dash represents zero.\nThere are {} zero values\nBlue dash = smallest positive value'.format(len(data[data == almost_zero]))
+        anchored_text = AnchoredText(message, loc=4)
+        axis.add_artist(anchored_text)
     axis.legend()
     
  
