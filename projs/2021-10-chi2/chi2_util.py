@@ -39,16 +39,24 @@ def chi2_score(df, features, target, alpha, verbose = False, deep = True):
         rc = df.pivot_table(values = 'id', columns = target, index = i, aggfunc = len).fillna(0)
                
         # remove the rc table rows with too few values, because the chi2 results can be unreliable otherwise
-        for column in rc.columns:
-            
-            if (deep):
+        if (deep):
                 # below a quick hack, rather than prod: we are cutting off all rows of low observed values.
                 # not exactly correct. The proper condition is:
                 # No more than 20% of the expected (sic!) counts are less than 5 and all individual expected counts are 1 or greater
-                rc = rc[rc[column]>= 5]
-            if (verbose):
-                print(rc)
-                print()
+                
+                # keep the rows with sum of frequencies bigger than limit
+                totals = rc.sum(axis = 1)
+                limit = 10 #arbitrary
+                high_freq = rc[totals>= limit]
+                # aggregate the remaining rows into one row
+                #  representing "all rows with low frequencies"
+                # and add that row to rc
+                low_freq = rc[totals <limit].sum(axis = 0)
+                # concatenate high and low frequency rows
+                rc = high_freq.append(low_freq, ignore_index = True)
+        if (verbose):
+            print(rc)
+            print()
                 
         # calculate chi2 statistics based on rc table
         chi2s, p, dof, expected = scs.chi2_contingency(rc)

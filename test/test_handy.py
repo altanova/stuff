@@ -32,6 +32,17 @@ def test_nothing(setup_logging):
     assert True, "dummy assertion"
 
 
+def test_round_up():
+    assert hd.round_up(98) == 100
+    assert hd.round_up(55) == 60
+    assert hd.round_up(10) == 10
+    assert hd.round_up(345) == 400
+
+def test_tidy_bins():
+    assert hd.tidy_bins([21,35,92], 4).tolist() == [0,25,50,75,100]
+    assert hd.tidy_bins([21,35,92]).tolist() == [0,10,20,30,40,50,60,70,80,90,100]
+    assert hd.tidy_bins([21,35,92], 5).tolist() == [0,20,40,60,80,100]
+
 def test_to_datetime():
     days = ['2021-04-05 00:00',  # Mon
             '2021-04-10 11:46',  # Sat

@@ -225,7 +225,7 @@ def hist8t_stacked(df,
 # group_field = if provided, the histogram will be stacked, and the stacked groups (colors) will derive
 # from grouping of records based on this field.
 
-def lhist(axis, 
+def lhistOLD(axis, 
           df, 
           field, 
           group_field = None, 
@@ -233,6 +233,12 @@ def lhist(axis,
           ax_titles = None,
          annotate = True):
 
+    # copy just the columns we need
+    if(group_field != None):
+        df = df[[field, group_field]].copy()
+    else:
+        df = df[[field]].copy()
+    
     # cannot present negative values on logarithm scale
 
     df = df[df[field] >=0 ]
@@ -240,17 +246,15 @@ def lhist(axis,
     # Do we have zeros in data? Then we will cheat a little, and upgrade zero to some small value
     smallest_observed_value = df[df[field] >0][field].min()
     almost_zero = smallest_observed_value / 2
-    df.loc[df[field] == 0, field] = almost_zero
+    data = df['data'] = df[field].mask(df[field] == 0, almost_zero) 
     
-    data = df[field]
-
     labels = None
-    mygroups = df[field]
+    mygroups = df['data']
     
     if(group_field != None):
         mygroups, labels = [], []
         for g, records in df.groupby(group_field):
-            mygroups.append(records[field])
+            mygroups.append(records['data'])
             labels.append(g)
 
     # prepare bins in log10 scale, 
@@ -264,13 +268,99 @@ def lhist(axis,
     plt.xscale('log')
     
     axis.axvline(x=almost_zero, color='r', linestyle='dashed', linewidth=2, label = 'zero')
-    axis.axvline(x=smallest_observed_value, color='b', linestyle='dashed', linewidth=2, label = '{:.3}'.format(smallest_observed_value))
+    axis.axvline(x=smallest_observed_value, color='g', linestyle='dashed', linewidth=2, label = '{:.3}'.format(smallest_observed_value))
     axis.axvline(x=df[field].median(), color='black', linestyle='dashed', linewidth=2, label = 'median')
     from matplotlib.offsetbox import AnchoredText
     if (annotate):
         message = 'Red dash represents zero.\nThere are {} zero values\nBlue dash = smallest positive value'.format(len(data[data == almost_zero]))
         anchored_text = AnchoredText(message, loc=4)
         axis.add_artist(anchored_text)
-    axis.legend()
+    axis.legend()    
+
+# return time-based xticks, suitable for logarithmic x axis
+# those can be used as input in lhist.
+# this function may also be seen as example, how custom ticks can be created.
+
+def time_xticks():
+    second = 1
+    minute = 60 * second
+    hour = 60 * minute
+    day = 24 * hour
+    week = 7 * day
+    month = 30 * day
+    year = 365 * day
+    quarter = year / 4
+    ticks = [second, 15 * second, minute, 15 * minute, hour, 6 * hour, day, 2 * day, week, month, quarter, year]
+    labels = ['1s', '15s', '1m', '15m', '1h', '6h', '24h', '2d', '1w', '1m', '3m', '1y']
+    return {'ticks': ticks, 'labels': labels}
+
+# draw logarithmic histogram of df[field]
+# parameters:
+# bin_density = how many bins should fit in one order of magnitude (eg. between 10 and 100)
+#
+# xticks - use this if you want custom ticks for the x axis. It accepts the following values:
+# 'time' - then the sample value from the function time_xticks() will be used
+# otherwise, the value should be {'ticks': ticks, 'labels': labels}
+# e.g. xticks = {'ticks': [10, 500, 2000], 'labels':['ten', 'five hundred', 'two K']}
     
- 
+def lhist(axis, 
+          df, 
+          field, 
+          group_field = None, 
+          bin_density = 16,
+          ax_titles = None,
+          annotate = True,
+          xticks = None):
+
+    # copy just the columns we need
+    if(group_field != None):
+        df = df[[field, group_field]].copy()
+    else:
+        df = df[[field]].copy()
+    
+    # cannot present negative values on logarithm scale
+
+    df = df[df[field] >=0 ]
+
+    # Do we have zeros in data? Then we will cheat a little, and upgrade zero to some small value
+    smallest_observed_value = df[df[field] >0][field].min()
+    almost_zero = smallest_observed_value / 2
+    data = df['data'] = df[field].mask(df[field] == 0, almost_zero) 
+    
+    labels = None
+    mygroups = df['data']
+    
+    if(group_field != None):
+        mygroups, labels = [], []
+        for g, records in df.groupby(group_field):
+            mygroups.append(records['data'])
+            labels.append(g)
+
+    # prepare bins in log10 scale, 
+    # make edges equally matching the powers of 10.
+    start = np.floor(np.log10(data.min()))
+    stop = np.ceil(np.log10(data.max()))
+    # return numbers spaced evenly on log scale, starting from base ** start to base ** stop
+    bins = np.logspace(start = start, stop = stop, num = int(stop - start) * bin_density)
+
+    axis.hist(stacked = True, x = mygroups, bins = bins, label = labels)
+    plt.xscale('log')
+    
+    if(xticks) :
+        # some seaborn styles cause the xticks markers disappear.
+        # make it reappear, so labels appear to point precisely
+        plt.rcParams['xtick.bottom'] = True
+        if (xticks == 'time'): 
+            # this function defines sample ticks useful if data represents time
+            xticks = time_xticks()
+        plt.xticks(ticks = xticks['ticks'], labels = xticks['labels'])
+        
+    axis.axvline(x=almost_zero, color='r', linestyle='dashed', linewidth=2, label = 'zero')
+    axis.axvline(x=smallest_observed_value, color='g', linestyle='dashed', linewidth=2, label = '{:.3}'.format(smallest_observed_value))
+    axis.axvline(x=df[field].median(), color='black', linestyle='dashed', linewidth=2, label = 'median')
+    from matplotlib.offsetbox import AnchoredText
+    if (annotate):
+        message = 'Red dash represents zero.\nThere are {} zero values\nBlue dash = smallest positive value'.format(len(data[data == almost_zero]))
+        anchored_text = AnchoredText(message, loc=4)
+        axis.add_artist(anchored_text)
+    axis.legend()    
