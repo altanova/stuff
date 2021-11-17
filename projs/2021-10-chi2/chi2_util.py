@@ -48,12 +48,16 @@ def chi2_score(df, features, target, alpha, verbose = False, deep = True):
                 totals = rc.sum(axis = 1)
                 limit = 10 #arbitrary
                 high_freq = rc[totals>= limit]
-                # aggregate the remaining rows into one row
+                # aggregate the remaining rows (if there are any) into one row
                 #  representing "all rows with low frequencies"
                 # and add that row to rc
-                low_freq = rc[totals <limit].sum(axis = 0)
-                # concatenate high and low frequency rows
-                rc = high_freq.append(low_freq, ignore_index = True)
+                if (len(rc[totals <limit]) > 0):
+                    low_freq = rc[totals <limit].sum(axis = 0)
+                    # concatenate high and low frequency rows
+                    rc = high_freq.append(low_freq, ignore_index = True)
+                else:
+                    rc = high_freq
+
         if (verbose):
             print(rc)
             print()
