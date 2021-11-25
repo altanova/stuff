@@ -5,10 +5,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
 
-# This function ranks the feature, according to their corrleation to the target feature.
+# This function ranks the feature, according to their correleation to the target feature.
 # The features must be categorical. The ranking is done with scipy.stats.chi2_contingency()
-# returns: dataframe of features, sorted descending by correlation.
-# Each feature comes with chi2 statistics, p-value, critical value, rank, and reversed rank.
+# returns: dataframe of features, sorted descending by the correlation rank.
+# This means that the feature  most closely correlated with the target should be on top.
+# For the ranking, the p-values are used. If two features return the same p-values, then
+# the feature whose chi2 score is most distant from its critical value will be ranked hiher
+# Each feature comes with chi2 statistics, p-value, degree of freedom, critical value, rank, and reversed rank.
 # There are two points (marked in the code) where the logic is simplified and could be improved.
 #
 # parameters:
@@ -40,9 +43,11 @@ def chi2_score(df, features, target, alpha, verbose = False, deep = True):
                
         # remove the rc table rows with too few values, because the chi2 results can be unreliable otherwise
         if (deep):
-                # below a quick hack, rather than prod: we are cutting off all rows of low observed values.
-                # not exactly correct. The proper condition is:
-                # No more than 20% of the expected (sic!) counts are less than 5 and all individual expected counts are 1 or greater
+                # below a quick hack, which should be improved: 
+                # we are cutting off all rows of low observed values.
+                # This is not exactly correct. The proper theoretical condition is:
+                # "No more than 20% of the expected (sic!) counts are 
+                # less than 5 and all individual expected counts are 1 or greater"
                 
                 # keep the rows with sum of frequencies bigger than limit
                 totals = rc.sum(axis = 1)
@@ -73,7 +78,10 @@ def chi2_score(df, features, target, alpha, verbose = False, deep = True):
                         name = i)
         scoring = scoring.append(row)
       
-    # The rows below calculate the rank, and sort the features accordingly
+    # drop the temporary column id
+    df.drop('id', axis=1, inplace=True)
+    
+    # The code below calculates the rank, and sorts the features accordingly
     
     # how do we rank the features? First of all, by the p-value (lowest p-value wins).
     # secondly if the p value is the same for two features, then the winning feature
