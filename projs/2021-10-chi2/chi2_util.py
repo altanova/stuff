@@ -5,13 +5,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
 
-# This function ranks the feature, according to their correleation to the target feature.
+# This function ranks the feature, according to their corrleation to the target feature.
 # The features must be categorical. The ranking is done with scipy.stats.chi2_contingency()
-# returns: dataframe of features, sorted descending by the correlation rank.
-# This means that the feature  most closely correlated with the target should be on top.
-# For the ranking, the p-values are used. If two features return the same p-values, then
-# the feature whose chi2 score is most distant from its critical value will be ranked hiher
-# Each feature comes with chi2 statistics, p-value, degree of freedom, critical value, rank, and reversed rank.
+# returns: dataframe of features, sorted descending by correlation.
+# Each feature comes with chi2 statistics, p-value, critical value, rank, and reversed rank.
 # There are two points (marked in the code) where the logic is simplified and could be improved.
 #
 # parameters:
@@ -19,11 +16,12 @@ from sklearn.linear_model import LogisticRegression
 # features = list of columns (features) of the source data that should be ranked
 # target = the name of
 # verbose = print what you are doing
-# deep = if True, then once the contigency table for a given feature has been built, 
-# the rows with too few values will be removed, before calculating chi2 statistics.
-# As an experimental feature, one can turn this condition to False, 
-# which will cause calculating the chi2 on all rows of the rc table.
-
+# deep = if True (detault), then the RC table calculated with proper chi2 conditions, that 
+# is: all cells must have expected count of 5 or more. How this works: the rows that have cells
+# with expected count <5 are aggregated into one row named OTHER, before calculating the chi2 statistics.
+# As an experimental feature, one can turn this variable to False, 
+# which will cause calculating the chi2 on all rows of the rc table, regardless their count.
+# According to literature this can return untrusted results, so True is recommended.
 
 def chi2_score(df, features, target, alpha, verbose = False, deep = True):
     
@@ -34,39 +32,53 @@ def chi2_score(df, features, target, alpha, verbose = False, deep = True):
 
     scoring = pd.DataFrame()
     prob = 1 - alpha
-    if (verbose): 
-        print('Contingency tables:\n ')
     for i in features:
         
         # create the contingency table (rc table)
         rc = df.pivot_table(values = 'id', columns = target, index = i, aggfunc = len).fillna(0)
-               
+        if (verbose):
+            print(f'feature {i}:\nContingency table')
+            print(rc)
+            print()               
         # remove the rc table rows with too few values, because the chi2 results can be unreliable otherwise
         if (deep):
-                # below a quick hack, which should be improved: 
-                # we are cutting off all rows of low observed values.
-                # This is not exactly correct. The proper theoretical condition is:
-                # "No more than 20% of the expected (sic!) counts are 
-                # less than 5 and all individual expected counts are 1 or greater"
+                # calculation of the expected values
+                # this is needed to calculate the condition for chi2:
+                # each cell should have expected count >5
+                # note some authores say 80% of the cells. We will strictly enforce all
+                row_totals = rc.sum(axis = 1).values[:, np.newaxis]
+                # category crequencies
+                cfreq = (rc.sum(axis = 0) / rc.values.sum()).values[np.newaxis, :]
                 
-                # keep the rows with sum of frequencies bigger than limit
-                totals = rc.sum(axis = 1)
-                limit = 10 #arbitrary
-                high_freq = rc[totals>= limit]
-                # aggregate the remaining rows (if there are any) into one row
-                #  representing "all rows with low frequencies"
-                # and add that row to rc
-                if (len(rc[totals <limit]) > 0):
-                    low_freq = rc[totals <limit].sum(axis = 0)
+                if (verbose):
+                    print('The expected distribution of categories:')
+                    print(cfreq)
+                    print()
+                # the dataframe of expected values
+                expected = pd.DataFrame(np.dot(row_totals, cfreq),  
+                             index = rc.index, 
+                             columns = rc.columns)
+                limit = 5
+                # rows that meet chi2 condition: expected >5 in each cell
+                high_freq = rc[(expected >= limit).any(axis = 1)]
+                # rows that do not meet that condition
+                low_freq = rc[(expected < limit).any(axis = 1)]
+                if (len(low_freq) > 0):
                     # concatenate high and low frequency rows
-                    rc = high_freq.append(low_freq, ignore_index = True)
+                    # Note there is possibility that only 1 row will be here, and so
+                    # this row will have expected count <5.
+                    # this is still ok, as most authors say that not all rows, but
+                    # 80% of rows should have the expected count >=5
+                    other = pd.Series(low_freq.sum(axis = 0), name = 'OTHER')
+                    rc = high_freq.append(other)
                 else:
                     rc = high_freq
 
         if (verbose):
+            print('Contingency table after removing low frequency rows')
             print(rc)
             print()
-                
+        
         # calculate chi2 statistics based on rc table
         chi2s, p, dof, expected = scs.chi2_contingency(rc)
         
@@ -76,8 +88,8 @@ def chi2_score(df, features, target, alpha, verbose = False, deep = True):
                          'critical': scs.chi2.ppf(prob, dof), 
                          'p': p}, 
                         name = i)
+
         scoring = scoring.append(row)
-      
     # drop the temporary column id
     df.drop('id', axis=1, inplace=True)
     
@@ -96,7 +108,6 @@ def chi2_score(df, features, target, alpha, verbose = False, deep = True):
     # if two features have same p-value, then feature with rank order by p value
     scoring = scoring.sort_values(by = ['p', 'reverse_rank'], ascending = True)
     return scoring    
-
 
 # A utility returning an accuracy of a given classifier 
 # on a given set of X, y (features, label)
