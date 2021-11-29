@@ -17,8 +17,11 @@ from sklearn.linear_model import LogisticRegression
 # target = the name of
 # verbose = print what you are doing
 # deep = if True (detault), then the RC table calculated with proper chi2 conditions, that 
-# is: all cells must have expected count of 5 or more. How this works: the rows that have cells
+# is: 80% cells must have expected count of 5 or more. How this works: the rows that have cells
 # with expected count <5 are aggregated into one row named OTHER, before calculating the chi2 statistics.
+# That artificial row will in most cases have high expected count, because it results from aggregation.
+# So strictly speaking, we are even stricter than the quoted condition and implemented the following:
+# All cells have expected count 5 or more, except (in rare situations) some cells in one row named OTHER.
 # As an experimental feature, one can turn this variable to False, 
 # which will cause calculating the chi2 on all rows of the rc table, regardless their count.
 # According to literature this can return untrusted results, so True is recommended.
